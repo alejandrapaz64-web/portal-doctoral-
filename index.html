@@ -359,7 +359,7 @@ footer{background:var(--azul);padding:24px 48px}
     <div class="filtro" role="group" aria-label="Filtrar por programa">
       <button data-prog="todos" aria-pressed="true">Todos</button>
       <button data-prog="edu" aria-pressed="false">Doctorado en Educación</button>
-      <button data-prog="tic" aria-pressed="false">Doctorado TIC</button>
+      <button data-prog="tic" aria-pressed="false">DieTic</button>
     </div>
   </div>
   <div class="pilares" id="pilares"></div>
@@ -385,12 +385,12 @@ const HERRAMIENTAS = [
   { frente: 'evalua', nombre: 'Evaluación por competencias', sub: 'En desarrollo', prog: ['edu'], estado: 'proximo', publico: false, url: '' },
   { frente: 'investiga', nombre: 'Sistema Doctoral', sub: 'Seguimiento investigativo · Cohorte 2026-1', prog: ['edu'], estado: 'activo', publico: false, url: 'https://alejandrapaz64-web.github.io/art.doc.ed/' },
   { frente: 'investiga', nombre: 'Repositorio de Producción Científica', sub: 'Búsqueda por tema · autor · año', prog: ['tic'], estado: 'activo', publico: true, url: 'https://alejandrapaz64-web.github.io/Produccion-Cientifica-DIETIC/' },
-  { frente: 'analitica', nombre: 'Dashboard — Doctorado en Educación', sub: 'KPIs · Cohortes · Seguimiento ejecutivo', prog: ['edu'], estado: 'activo', publico: false, url: 'https://app.powerbi.com/view?r=eyJrIjoiZWZlOTdmMzEtMTkwMS00NGIzLWE4NjYtOWE0ZmEwODM1ZDg4IiwidCI6ImFjYTUxNjMxLTAwZmUtNDkwZC05MWFiLTE2M2VmODcyNjBlZSIsImMiOjR9' },
-  { frente: 'analitica', nombre: 'Dashboard — Doctorado en Innovación Educativa con uso de TIC', sub: 'En construcción', prog: ['tic'], estado: 'preliminar', publico: false, url: 'https://app.powerbi.com/view?r=eyJrIjoiZDMxOTNlN2UtYmEzZi00Y2JmLTg2MzYtYjFjMzBhOGJiMmI3IiwidCI6ImFjYTUxNjMxLTAwZmUtNDkwZC05MWFiLTE2M2VmODcyNjBlZSIsImMiOjR9' }
+  { frente: 'analia', nombre: 'Dashboard — Doctorado en Educación', sub: 'KPIs · Cohortes · Seguimiento ejecutivo', prog: ['edu'], estado: 'activo', publico: false, url: 'https://app.powerbi.com/view?r=eyJrIjoiZWZlOTdmMzEtMTkwMS00NGIzLWE4NjYtOWE0ZmEwODM1ZDg4IiwidCI6ImFjYTUxNjMxLTAwZmUtNDkwZC05MWFiLTE2M2VmODcyNjBlZSIsImMiOjR9' },
+  { frente: 'analia', nombre: 'Dashboard — Doctorado en Innovación Educativa con uso de ', sub: 'En construcción', prog: [''], estado: 'preliminar', publico: false, url: 'https://app.powerbi.com/view?r=eyJrIjoiZDMxOTNlN2UtYmEzZi00Y2JmLTg2MzYtYjFjMzBhOGJiMmI3IiwidCI6ImFjYTUxNjMxLTAwZmUtNDkwZC05MWFiLTE2M2VmODcyNjBlZSIsImMiOjR9' }
 ];
 let filtro = 'todos';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const etiquetaProg = p => p.length > 1 ? 'Ambos programas' : p[0] === 'edu' ? 'Doctorado en Educación' : 'Doctorado TIC';
+const etiquetaProg = p => p.length > 1 ? 'Ambos programas' : p[0] === 'edu' ? 'Doctorado en Educación' : 'Dietic';
 
 function herramienta(h) {
   const dot = h.estado === 'activo' ? 'dot-verde' : h.estado === 'preliminar' ? 'dot-pre' : 'dot-off';
