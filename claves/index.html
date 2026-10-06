@@ -234,11 +234,69 @@ if(sessionStorage.getItem("aleja_access_ok")==="1"){
   document.getElementById("loginScreen").classList.add("hidden");
 }
 
-const KEY="aleja_doctorados_accesos_v1";
-let data=JSON.parse(localStorage.getItem(KEY)||"[]");
+// ===== GOOGLE SHEETS BACKEND =====
+// 1) Pega aquí la URL de tu implementación de Google Apps Script.
+const API_URL = 'https://script.google.com/macros/s/AKfycbweObLkVptd-Xh9y6oFFb6MLqm1H9B7ftLoTZ6pDa--CLtQosWnwLug9yAqSv7xe3OKzw/exec';
+// 2) Debe coincidir con APP_TOKEN en el Apps Script.
+const API_TOKEN = 'ECYxi8hA9mcxxixHt1sraAh22cEi4ItuSw7wJEaY8lo';
 
-function save(){localStorage.setItem(KEY,JSON.stringify(data));}
-function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));}
+let data=[];
+let loading=true;
+
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;", "'":"&#039;"}[m]));}
+function uuid(){return crypto.randomUUID ? crypto.randomUUID() : Date.now()+"-"+Math.random().toString(16).slice(2);}
+
+function setStatus(msg,ok=true){
+  let el=document.getElementById("syncStatus");
+  if(!el){
+    el=document.createElement("div"); el.id="syncStatus";
+    el.style.cssText="position:fixed;right:18px;bottom:18px;background:#fff;border:1px solid #d8e1ef;border-radius:12px;padding:10px 14px;box-shadow:0 8px 30px rgba(0,32,91,.12);font:600 12px Arial;color:#234;z-index:9999";
+    document.body.appendChild(el);
+  }
+  el.textContent=msg; el.style.borderColor=ok?"#b8d9c2":"#e0b3b3";
+}
+
+function jsonp(url){
+  return new Promise((resolve,reject)=>{
+    const cb="nexoCB_"+Date.now()+"_"+Math.floor(Math.random()*10000);
+    const script=document.createElement("script");
+    const timer=setTimeout(()=>{cleanup();reject(new Error("Tiempo de espera agotado"));},15000);
+    function cleanup(){clearTimeout(timer);delete window[cb];script.remove();}
+    window[cb]=(payload)=>{cleanup();resolve(payload)};
+    script.onerror=()=>{cleanup();reject(new Error("No se pudo conectar con Google Sheets"));};
+    script.src=url+(url.includes("?")?"&":"?")+"action=list&token="+encodeURIComponent(API_TOKEN)+"&callback="+cb;
+    document.head.appendChild(script);
+  });
+}
+
+async function loadFromSheets(){
+  if(API_URL.includes("PEGA_AQUI")){
+    loading=false; render();
+    setStatus("Configura primero la URL de Apps Script",false); return;
+  }
+  setStatus("Sincronizando con Google Sheets…");
+  try{
+    const r=await jsonp(API_URL);
+    if(!r.ok) throw new Error(r.error||"Error del servidor");
+    data=(r.data||[]).map(x=>({id:String(x.id||uuid()),tool:String(x.tool||""),url:String(x.url||""),user:String(x.user||""),pass:String(x.pass||""),notes:String(x.notes||"")}));
+    loading=false; render(); setStatus("Sincronizado con Google Sheets");
+  }catch(e){
+    loading=false; render(); setStatus("No se pudo sincronizar: "+e.message,false);
+  }
+}
+
+function postToSheets(payload){
+  return new Promise((resolve)=>{
+    const iframe=document.createElement("iframe"); iframe.name="nexoPostFrame"+Date.now(); iframe.style.display="none"; document.body.appendChild(iframe);
+    const form=document.createElement("form"); form.method="POST"; form.action=API_URL; form.target=iframe.name; form.style.display="none";
+    const fields={token:API_TOKEN,...payload};
+    Object.entries(fields).forEach(([k,v])=>{const input=document.createElement("input");input.type="hidden";input.name=k;input.value=typeof v==="string"?v:JSON.stringify(v);form.appendChild(input);});
+    document.body.appendChild(form); form.submit(); form.remove();
+    setTimeout(()=>{iframe.remove();resolve()},1200);
+  });
+}
+
+function escHtml(s){return esc(s);}
 function openForm(id=null){
   document.getElementById("modal").classList.add("open");
   document.getElementById("modalTitle").textContent=id?"Editar acceso":"Nuevo acceso";
@@ -252,34 +310,24 @@ function openForm(id=null){
   setTimeout(()=>document.getElementById("tool").focus(),50);
 }
 function closeForm(){document.getElementById("modal").classList.remove("open");}
-function saveAccess(e){
+async function saveAccess(e){
   e.preventDefault();
-  const id=document.getElementById("editId").value||crypto.randomUUID();
+  const id=document.getElementById("editId").value||uuid();
   const item={id,tool:document.getElementById("tool").value.trim(),url:document.getElementById("url").value.trim(),user:document.getElementById("user").value.trim(),pass:document.getElementById("pass").value,notes:document.getElementById("notes").value.trim()};
-  const i=data.findIndex(a=>a.id===id);
-  if(i>=0)data[i]=item; else data.push(item);
-  save(); closeForm(); render();
+  const i=data.findIndex(a=>a.id===id); if(i>=0)data[i]=item; else data.push(item);
+  closeForm(); render(); setStatus("Guardando en Google Sheets…");
+  await postToSheets({action:"upsert",record:item});
+  setStatus("Guardado en Google Sheets");
+  await loadFromSheets();
 }
-function del(id){
-  if(confirm("¿Eliminar este acceso?")){data=data.filter(a=>a.id!==id);save();render();}
+async function del(id){
+  if(!confirm("¿Eliminar este acceso?"))return;
+  data=data.filter(a=>a.id!==id); render(); setStatus("Eliminando de Google Sheets…");
+  await postToSheets({action:"delete",id});
+  setStatus("Eliminado de Google Sheets"); await loadFromSheets();
 }
-async function copyText(v){
-  try{
-    await navigator.clipboard.writeText(v);
-    alert("Copiado al portapapeles.");
-  }catch(e){
-    const ta=document.createElement("textarea");
-    ta.value=v; document.body.appendChild(ta); ta.select();
-    document.execCommand("copy"); ta.remove();
-    alert("Copiado al portapapeles.");
-  }
-}
-function togglePass(id,el){
-  const x=data.find(a=>a.id===id);
-  if(!x)return;
-  el.dataset.show=el.dataset.show==="1"?"0":"1";
-  el.querySelector("span").textContent=el.dataset.show==="1"?(x.pass||""):"••••••••";
-}
+async function copyText(v){try{await navigator.clipboard.writeText(v);alert("Copiado al portapapeles.");}catch(e){const ta=document.createElement("textarea");ta.value=v;document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove();alert("Copiado al portapapeles.");}}
+function togglePass(id,el){const x=data.find(a=>a.id===id);if(!x)return;el.dataset.show=el.dataset.show==="1"?"0":"1";el.querySelector("span").textContent=el.dataset.show==="1"?(x.pass||""):"••••••••";}
 function render(){
   const q=document.getElementById("search").value.toLowerCase().trim();
   const rows=data.filter(x=>[x.tool,x.url,x.user,x.notes].join(" ").toLowerCase().includes(q));
@@ -288,55 +336,19 @@ function render(){
   document.getElementById("nVisible").textContent=rows.length;
   const tb=document.getElementById("tbody");
   if(!rows.length){tb.innerHTML='<tr><td colspan="6" class="empty">No hay accesos para mostrar. Usa <b>＋ Nuevo acceso</b> para comenzar.</td></tr>';return;}
-  tb.innerHTML=rows.map(x=>`
-    <tr>
-      <td><div class="tool">${esc(x.tool)}</div></td>
-      <td>${x.url?`<a class="url" href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.url)}</a>`:"—"}</td>
-      <td><span class="user">${esc(x.user)}</span> <button class="iconbtn" title="Copiar usuario" onclick='copyText(${JSON.stringify(x.user)})'>⧉</button></td>
-      <td>
-  <div class="pass" data-show="0">
-    <span>••••••••</span>
-    <button class="iconbtn" type="button" title="Mostrar / ocultar clave" onclick="togglePass('${x.id}',this.parentElement)">◉</button>
-    <button class="iconbtn copy-key" type="button" title="Copiar clave" onclick='copyText(${JSON.stringify(x.pass||"")})'>⧉</button>
-  </div>
-</td>
-      <td>${esc(x.notes)||"—"}</td>
-      <td><div class="actions"><button class="iconbtn" onclick="openForm('${x.id}')">Editar</button><button class="iconbtn" onclick="del('${x.id}')">Borrar</button></div></td>
-    </tr>`).join("");
+  tb.innerHTML=rows.map(x=>`<tr><td><div class="tool">${esc(x.tool)}</div></td><td>${x.url?`<a class="url" href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.url)}</a>`:"—"}</td><td><span class="user">${esc(x.user)}</span> <button class="iconbtn" title="Copiar usuario" onclick='copyText(${JSON.stringify(x.user)})'>⧉</button></td><td><div class="pass" data-show="0"><span>••••••••</span><button class="iconbtn" type="button" title="Mostrar / ocultar clave" onclick="togglePass('${x.id}',this.parentElement)">◉</button><button class="iconbtn copy-key" type="button" title="Copiar clave" onclick='copyText(${JSON.stringify(x.pass||"")})'>⧉</button></div></td><td>${esc(x.notes)||"—"}</td><td><div class="actions"><button class="iconbtn" onclick="openForm('${x.id}')">Editar</button><button class="iconbtn" onclick="del('${x.id}')">Borrar</button></div></td></tr>`).join("");
 }
 function exportExcel(){
   if(typeof XLSX==="undefined"){alert("La función de Excel necesita conexión a internet para cargar el componente de exportación.");return;}
   const rows=data.map(x=>({Herramienta:x.tool,URL:x.url,"Usuario / correo":x.user,Clave:x.pass,Notas:x.notes}));
-  const ws=XLSX.utils.json_to_sheet(rows);
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,"Accesos");
-  ws["!cols"]=[{wch:32},{wch:48},{wch:34},{wch:28},{wch:38}];
-  XLSX.writeFile(wb,"Centro_de_Accesos_Doctorados_Aleja.xlsx");
+  const ws=XLSX.utils.json_to_sheet(rows); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Accesos"); ws["!cols"]=[{wch:32},{wch:48},{wch:34},{wch:28},{wch:38}]; XLSX.writeFile(wb,"Centro_de_Accesos_Doctorados_Aleja.xlsx");
 }
 function importExcel(e){
   const file=e.target.files[0]; if(!file)return;
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    try{
-      const wb=XLSX.read(ev.target.result,{type:"array"});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{defval:""});
-      const imported=rows.map(r=>({
-        id:crypto.randomUUID(),
-        tool:r["Herramienta"]||r["herramienta"]||"",
-        url:r["URL"]||r["Url"]||r["url"]||"",
-        user:r["Usuario / correo"]||r["Usuario"]||r["usuario"]||"",
-        pass:r["Clave"]||r["clave"]||"",
-        notes:r["Notas"]||r["notas"]||""
-      })).filter(x=>x.tool||x.user||x.url);
-      if(imported.length){
-        if(confirm(`Se encontraron ${imported.length} registros. ¿Quieres agregarlos a los que ya tienes?`)){data=[...data,...imported];save();render();}
-      }
-    }catch(err){alert("No pude leer ese archivo. Verifica que tenga las columnas Herramienta, URL, Usuario / correo, Clave y Notas.");}
-    e.target.value="";
-  };
-  reader.readAsArrayBuffer(file);
+  const reader=new FileReader(); reader.onload=ev=>{try{const wb=XLSX.read(ev.target.result,{type:"array"});const ws=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{defval:""});const imported=rows.map(r=>({id:uuid(),tool:r["Herramienta"]||r["herramienta"]||"",url:r["URL"]||r["Url"]||r["url"]||"",user:r["Usuario / correo"]||r["Usuario"]||r["usuario"]||"",pass:r["Clave"]||r["clave"]||"",notes:r["Notas"]||r["notas"]||""})).filter(x=>x.tool||x.user||x.url);if(imported.length&&confirm(`Se encontraron ${imported.length} registros. ¿Quieres cargarlos en Google Sheets?`)){(async()=>{setStatus("Cargando registros en Google Sheets…");for(const item of imported)await postToSheets({action:"upsert",record:item});await loadFromSheets();})();}}catch(err){alert("No pude leer ese archivo. Verifica que tenga las columnas Herramienta, URL, Usuario / correo, Clave y Notas.");}e.target.value="";}; reader.readAsArrayBuffer(file);
 }
+document.getElementById("modal").addEventListener("click",e=>{if(e.target.id==="modal")closeForm()});
+render(); loadFromSheets();
 document.getElementById("modal").addEventListener("click",e=>{if(e.target.id==="modal")closeForm()});
 render();
 </script>
