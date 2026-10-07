@@ -191,6 +191,9 @@ main{max-width:1200px;margin:0 auto;padding:40px 48px 72px}
 
 .pilar-body{padding:16px 22px 20px;flex:1;display:flex;flex-direction:column}
 .pilar-desc{font-size:13px;color:var(--texto2);line-height:1.65;margin-bottom:14px;flex:1}
+.genera{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.genera span{font-size:11px;font-weight:500;color:var(--azul2);background:var(--azul-light);border-radius:20px;padding:3px 10px}
+.genera span::before{content:"✓ ";font-weight:600}
 
 .tools{display:flex;flex-direction:column;gap:8px}
 .tools.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
@@ -376,13 +379,14 @@ footer{background:var(--azul);padding:24px 48px}
 const EXT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
 const PROGRAMAS = { edu: 'Doctorado en Educación', tic: 'Doctorado en Innovación Educativa con uso de TIC' };
 const FRENTES = [
-  { id: 'documentos', tag: 'Gestión documental', nombre: 'NEXO Documentos', acento: 'accent-azul', icono: 'ic-azul', svg: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>', desc: 'Generación, firma digital y distribución de documentos institucionales oficiales.' },
+  { id: 'documentos', tag: 'Gestión documental', nombre: 'NEXO Documentos', acento: 'accent-azul', icono: 'ic-azul', svg: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>', desc: 'Generación, firma digital y distribución de documentos y comunicaciones institucionales.' },
   { id: 'evalua', tag: 'Evaluación académica', nombre: 'NEXO Evalúa', acento: 'accent-verde', icono: 'ic-verde', svg: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>', desc: 'Evaluación por competencias con lógica en cascada: RPA → competencia → asignatura.' },
   { id: 'investiga', tag: 'Seguimiento investigativo', nombre: 'NEXO Investiga', acento: 'accent-aqua', icono: 'ic-aqua', svg: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>', desc: 'Producción científica, avance de tesis y alertas de riesgo académico por estudiante y cohorte.' },
   { id: 'analitica', tag: 'Analítica Estratégica · Toma de decisiones directivas', nombre: 'Dashboard Analítico Doctoral — Vista Ejecutiva', acento: 'accent-full', icono: 'ic-azul', svg: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><rect x="2" y="20" width="20" height="2" rx="1"/>', desc: 'Indicadores clave de gestión académica: deserción, tiempos de grado, cohortes activas y rendimiento por programa. Diseñado para toma de decisiones directivas.', ancho: true, grid2: true }
 ];
 const HERRAMIENTAS = [
-  { frente: 'documentos', nombre: 'Asistente de Cartas y Certificaciones', sub: 'Cartas · Certificados · Actas', prog: ['edu', 'tic'], estado: 'activo', publico: false, url: 'https://alejandrapaz64-web.github.io/Asistente-de-Cartas-y-Certificaciones/' },
+  { frente: 'documentos', nombre: 'Asistente de Cartas y Certificaciones', sub: 'Cartas · Certificados · Actas doctorales', prog: ['edu', 'tic'], estado: 'activo', publico: false, url: 'https://alejandrapaz64-web.github.io/Asistente-de-Cartas-y-Certificaciones/' },
+  { frente: 'documentos', nombre: 'Comunicación Doctoral', sub: 'Correos masivos · Invitaciones a eventos', prog: ['edu', 'tic'], estado: 'activo', publico: false, url: 'https://alejandrapaz64-web.github.io/Asistente-de-Cartas-y-Certificaciones/' },
   { frente: 'evalua', nombre: 'SEDIETIC', sub: 'Evaluación por competencias', prog: ['tic'], estado: 'activo', publico: false, url: 'https://alejandrapaz64-web.github.io/SEDIETIC/' },
   { frente: 'evalua', nombre: 'Evaluación', sub: 'En desarrollo', prog: ['edu'], estado: 'proximo', publico: false, url: '' },
   { frente: 'investiga', nombre: 'Sistema Doctoral', sub: 'Seguimiento investigativo · Cohorte 2026-1', prog: ['edu'], estado: 'activo', publico: false, url: 'https://alejandrapaz64-web.github.io/art.doc.ed/' },
@@ -407,7 +411,7 @@ function pintar() {
     const lista = visibles.filter(h => h.frente === f.id);
     return `<section class="pilar${f.ancho ? ' pilar-full' : ''}"><div class="pilar-accent ${f.acento}"></div>
 <div class="pilar-header"><div class="pilar-icon ${f.icono}"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${f.svg}</svg></div><div><div class="pilar-tag">${f.tag}</div><h2 class="pilar-nombre">${f.nombre}</h2></div></div>
-<div class="pilar-body"><p class="pilar-desc">${f.desc}</p><div class="tools${f.grid2 && lista.length > 1 ? ' grid2' : ''}">${lista.length ? lista.map(herramienta).join('') : '<div class="vacio-prog">Sin herramientas para este programa por ahora.</div>'}</div></div></section>`;
+<div class="pilar-body"><div class="pilar-desc"><p>${f.desc}</p>${f.genera ? `<div class="genera">${f.genera.map(g => `<span>${g}</span>`).join('')}</div>` : ''}</div><div class="tools${f.grid2 && lista.length > 1 ? ' grid2' : ''}">${lista.length ? lista.map(herramienta).join('') : '<div class="vacio-prog">Sin herramientas para este programa por ahora.</div>'}</div></div></section>`;
   }).join('');
   const activos = HERRAMIENTAS.filter(h => h.estado === 'activo').length;
   const desarrollo = HERRAMIENTAS.length - activos;
