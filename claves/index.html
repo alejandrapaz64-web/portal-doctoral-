@@ -119,6 +119,7 @@ textarea{min-height:75px;resize:vertical}
     </div>
   </div>
   <a class="back-nexo" href="../">← Volver a NEXO</a>
+  <a class="back-nexo" href="#" onclick="cerrarSesion();return false;" style="margin-left:8px;">🔒 Cerrar sesión</a>
 </header>
 
 <main class="container">
@@ -177,19 +178,35 @@ textarea{min-height:75px;resize:vertical}
 </div>
 
 <script>
-const ACCESS_HASH = "e7bc51d5c2f6be75bcb93c00401cdca0366d0c7c1b9ffe26eb7be6cd3757f571";
-function login(e){
+async function login(e){
   e.preventDefault();
-  const value = document.getElementById("loginPassword").value;
-  const hash = sha256(value);
-  if(hash === ACCESS_HASH){
-    sessionStorage.setItem("aleja_access_ok","1");
+  const campo=document.getElementById("loginPassword");
+  const err=document.getElementById("loginError");
+  const btn=document.querySelector(".login-button");
+  if(!campo.value) return;
+  err.style.display="none";
+  btn.disabled=true; btn.textContent="Verificando…";
+  const tk=sha256(campo.value);
+  try{
+    const r=await jsonp(API_URL,tk);
+    if(!r.ok) throw new Error(r.error||"No autorizado");
+    API_TOKEN=tk;
+    sessionStorage.setItem("aleja_access_tk",tk);
+    sessionStorage.removeItem("aleja_access_ok");
+    campo.value="";
     document.getElementById("loginScreen").classList.add("hidden");
-    document.getElementById("loginPassword").value="";
-  } else {
-    document.getElementById("loginError").style.display="block";
-    document.getElementById("loginPassword").select();
+    aplicarDatos(r.data); setStatus("Sincronizado con Google Sheets");
+  }catch(ex){
+    err.textContent=/autorizado/i.test(ex.message)?"Contraseña incorrecta. Intenta nuevamente.":"No se pudo conectar con Google Sheets. Revisa tu conexión.";
+    err.style.display="block";
+    campo.select();
+  }finally{
+    btn.disabled=false; btn.textContent="Ingresar";
   }
+}
+function cerrarSesion(){
+  sessionStorage.removeItem("aleja_access_tk");
+  location.reload();
 }
 function toggleLoginPassword(){
   const el=document.getElementById("loginPassword");
@@ -230,15 +247,12 @@ function sha256(str){
   }
   return h.map(x=>x.toString(16).padStart(8,"0")).join("");
 }
-if(sessionStorage.getItem("aleja_access_ok")==="1"){
-  document.getElementById("loginScreen").classList.add("hidden");
-}
 
 // ===== GOOGLE SHEETS BACKEND =====
 // 1) Pega aquí la URL de tu implementación de Google Apps Script.
 const API_URL = 'https://script.google.com/macros/s/AKfycbweObLkVptd-Xh9y6oFFb6MLqm1H9B7ftLoTZ6pDa--CLtQosWnwLug9yAqSv7xe3OKzw/exec';
-// 2) Debe coincidir con APP_TOKEN en el Apps Script.
-const API_TOKEN = 'ECYxi8hA9mcxxixHt1sraAh22cEi4ItuSw7wJEaY8lo';
+// 2) La credencial se obtiene al iniciar sesión; no se guarda en este archivo.
+let API_TOKEN = sessionStorage.getItem("aleja_access_tk")||"";
 
 let data=[];
 let loading=true;
@@ -256,7 +270,7 @@ function setStatus(msg,ok=true){
   el.textContent=msg; el.style.borderColor=ok?"#b8d9c2":"#e0b3b3";
 }
 
-function jsonp(url){
+function jsonp(url,tk){
   return new Promise((resolve,reject)=>{
     const cb="nexoCB_"+Date.now()+"_"+Math.floor(Math.random()*10000);
     const script=document.createElement("script");
@@ -264,12 +278,17 @@ function jsonp(url){
     function cleanup(){clearTimeout(timer);delete window[cb];script.remove();}
     window[cb]=(payload)=>{cleanup();resolve(payload)};
     script.onerror=()=>{cleanup();reject(new Error("No se pudo conectar con Google Sheets"));};
-    script.src=url+(url.includes("?")?"&":"?")+"action=list&token="+encodeURIComponent(API_TOKEN)+"&callback="+cb;
+    script.src=url+(url.includes("?")?"&":"?")+"action=list&token="+encodeURIComponent(tk||API_TOKEN)+"&callback="+cb;
     document.head.appendChild(script);
   });
 }
 
+function aplicarDatos(lista){
+  data=(lista||[]).map(x=>({id:String(x.id||uuid()),tool:String(x.tool||""),url:String(x.url||""),user:String(x.user||""),pass:String(x.pass||""),notes:String(x.notes||"")}));
+  loading=false; render();
+}
 async function loadFromSheets(){
+  if(!API_TOKEN) return;
   if(API_URL.includes("PEGA_AQUI")){
     loading=false; render();
     setStatus("Configura primero la URL de Apps Script",false); return;
@@ -277,9 +296,12 @@ async function loadFromSheets(){
   setStatus("Sincronizando con Google Sheets…");
   try{
     const r=await jsonp(API_URL);
-    if(!r.ok) throw new Error(r.error||"Error del servidor");
-    data=(r.data||[]).map(x=>({id:String(x.id||uuid()),tool:String(x.tool||""),url:String(x.url||""),user:String(x.user||""),pass:String(x.pass||""),notes:String(x.notes||"")}));
-    loading=false; render(); setStatus("Sincronizado con Google Sheets");
+    if(!r.ok){
+      if(/autorizado/i.test(r.error||"")){ cerrarSesion(); return; }
+      throw new Error(r.error||"Error del servidor");
+    }
+    aplicarDatos(r.data);
+    setStatus("Sincronizado con Google Sheets");
   }catch(e){
     loading=false; render(); setStatus("No se pudo sincronizar: "+e.message,false);
   }
@@ -348,9 +370,13 @@ function importExcel(e){
   const reader=new FileReader(); reader.onload=ev=>{try{const wb=XLSX.read(ev.target.result,{type:"array"});const ws=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{defval:""});const imported=rows.map(r=>({id:uuid(),tool:r["Herramienta"]||r["herramienta"]||"",url:r["URL"]||r["Url"]||r["url"]||"",user:r["Usuario / correo"]||r["Usuario"]||r["usuario"]||"",pass:r["Clave"]||r["clave"]||"",notes:r["Notas"]||r["notas"]||""})).filter(x=>x.tool||x.user||x.url);if(imported.length&&confirm(`Se encontraron ${imported.length} registros. ¿Quieres cargarlos en Google Sheets?`)){(async()=>{setStatus("Cargando registros en Google Sheets…");for(const item of imported)await postToSheets({action:"upsert",record:item});await loadFromSheets();})();}}catch(err){alert("No pude leer ese archivo. Verifica que tenga las columnas Herramienta, URL, Usuario / correo, Clave y Notas.");}e.target.value="";}; reader.readAsArrayBuffer(file);
 }
 document.getElementById("modal").addEventListener("click",e=>{if(e.target.id==="modal")closeForm()});
-render(); loadFromSheets();
-document.getElementById("modal").addEventListener("click",e=>{if(e.target.id==="modal")closeForm()});
 render();
+if(API_TOKEN){
+  document.getElementById("loginScreen").classList.add("hidden");
+  loadFromSheets();
+} else {
+  setTimeout(()=>{ const c=document.getElementById("loginPassword"); if(c) c.focus(); },50);
+}
 </script>
 </body>
 </html>
